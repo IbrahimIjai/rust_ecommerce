@@ -158,6 +158,25 @@ pub async fn create_order(
     .map_err(AppError::from)?;
 
     for item in &cart_items {
+        // Atomically decrement stock — fails if insufficient
+        let stock_result = sqlx::query(
+            "UPDATE products
+             SET stock_quantity = stock_quantity - $1, updated_at = NOW()
+             WHERE id = $2 AND stock_quantity >= $1",
+        )
+        .bind(item.quantity)
+        .bind(item.product_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        if stock_result.rows_affected() == 0 {
+            return Err(AppError::BadRequest(format!(
+                "Insufficient stock for '{}'",
+                item.product_name
+            )));
+        }
+
         let subtotal = item.product_price * item.quantity;
         sqlx::query(
             "INSERT INTO order_items
