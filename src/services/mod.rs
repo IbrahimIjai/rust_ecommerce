@@ -1,7 +1,7 @@
 pub mod database;
 pub mod payment;
 
-pub use database::{check_database_health, create_connection_pool, run_migrations, DbPool};
+pub use database::{create_connection_pool, run_migrations, DbPool};
 pub use payment::PaystackService;
 
 use axum::extract::FromRef;
