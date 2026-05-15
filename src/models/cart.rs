@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+use validator::Validate;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct CartItem {
@@ -13,14 +14,16 @@ pub struct CartItem {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct AddToCart {
     pub product_id: Uuid,
+    #[validate(range(min = 1, max = 100, message = "quantity must be between 1 and 100"))]
     pub quantity: i32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct UpdateCartItem {
+    #[validate(range(min = 0, max = 100, message = "quantity must be between 0 and 100"))]
     pub quantity: i32,
 }
 

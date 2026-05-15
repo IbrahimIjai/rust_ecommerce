@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+use validator::Validate;
+
 use crate::auth::Role;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -27,17 +29,30 @@ pub struct CreateUser {
     pub name: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct SignupRequest {
+    #[validate(email(message = "must be a valid email"))]
     pub email: String,
+    #[validate(length(min = 2, max = 100, message = "must be 2–100 characters"))]
     pub name: String,
+    #[validate(length(min = 8, message = "must be at least 8 characters"))]
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct LoginRequest {
+    #[validate(email(message = "must be a valid email"))]
     pub email: String,
+    #[validate(length(min = 1, message = "required"))]
     pub password: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ResetPasswordValidated {
+    #[validate(length(min = 1, message = "required"))]
+    pub reset_token: String,
+    #[validate(length(min = 8, message = "must be at least 8 characters"))]
+    pub new_password: String,
 }
 
 #[derive(Debug, Deserialize)]

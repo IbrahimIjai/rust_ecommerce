@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, response::Json};
+use crate::extractors::ValidatedJson;
 use chrono::{Duration, Utc};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -28,7 +29,7 @@ fn build_auth_response(
 pub async fn signup(
     State(pool): State<DbPool>,
     State(keys): State<Arc<JwtKeys>>,
-    Json(body): Json<SignupRequest>,
+    ValidatedJson(body): ValidatedJson<SignupRequest>,
 ) -> Result<(StatusCode, Json<AuthResponse>), AppError> {
     // Check for duplicate email
     let existing = sqlx::query("SELECT id FROM users WHERE email = $1")
@@ -70,7 +71,7 @@ pub async fn signup(
 pub async fn login(
     State(pool): State<DbPool>,
     State(keys): State<Arc<JwtKeys>>,
-    Json(body): Json<LoginRequest>,
+    ValidatedJson(body): ValidatedJson<LoginRequest>,
 ) -> Result<Json<AuthResponse>, AppError> {
     // Always return the same error whether email not found or password wrong
     // (prevents email enumeration)
