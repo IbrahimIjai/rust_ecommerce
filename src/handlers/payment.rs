@@ -2,6 +2,7 @@ use axum::{extract::State, response::Json};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use crate::auth::Claims;
 use crate::error::AppError;
 use crate::models::Order;
 use crate::services::{DbPool, PaystackService};
@@ -9,6 +10,7 @@ use crate::services::{DbPool, PaystackService};
 #[derive(serde::Deserialize)]
 pub struct InitializePaymentRequest {
     pub order_id: Uuid,
+    /// Customer email to send Paystack payment link to
     pub email: String,
 }
 
@@ -17,7 +19,9 @@ pub struct VerifyPaymentRequest {
     pub reference: String,
 }
 
+/// POST /api/payment/initialize — Authenticated
 pub async fn initialize_payment(
+    claims: Claims,
     State(pool): State<DbPool>,
     State(paystack): State<PaystackService>,
     Json(body): Json<InitializePaymentRequest>,
@@ -28,6 +32,11 @@ pub async fn initialize_payment(
         .await
         .map_err(AppError::from)?
         .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
+
+    // Customers can only pay for their own orders
+    if claims.user_id()? != order.user_id {
+        return Err(AppError::Forbidden);
+    }
 
     if order.status != "pending" {
         return Err(AppError::BadRequest(
@@ -45,10 +54,7 @@ pub async fn initialize_payment(
             .bind(order.id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| {
-                tracing::error!("Failed to update payment reference (mock): {}", e);
-                AppError::from(e)
-            })?;
+            .map_err(AppError::from)?;
 
         tx.commit().await.map_err(AppError::from)?;
 
@@ -82,10 +88,7 @@ pub async fn initialize_payment(
         .bind(order.id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| {
-            tracing::error!("Failed to update payment reference: {}", e);
-            AppError::from(e)
-        })?;
+        .map_err(AppError::from)?;
 
     tx.commit().await.map_err(AppError::from)?;
 
@@ -100,7 +103,9 @@ pub async fn initialize_payment(
     })))
 }
 
+/// POST /api/payment/verify — Authenticated
 pub async fn verify_payment(
+    _claims: Claims,
     State(pool): State<DbPool>,
     State(paystack): State<PaystackService>,
     Json(body): Json<VerifyPaymentRequest>,

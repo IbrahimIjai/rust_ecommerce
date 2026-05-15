@@ -5,6 +5,7 @@ use axum::{
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::auth::{Claims, Role};
 use crate::error::AppError;
 use crate::models::{AddToCart, CartItemResponse, CartResponse, UpdateCartItem};
 use crate::services::DbPool;
@@ -24,10 +25,21 @@ struct CartItemBasic {
     quantity: i32,
 }
 
+fn check_cart_ownership(claims: &Claims, path_user_id: Uuid) -> Result<(), AppError> {
+    if claims.role != Role::Admin && claims.user_id()? != path_user_id {
+        return Err(AppError::Forbidden);
+    }
+    Ok(())
+}
+
+/// GET /api/cart/:user_id — owner or admin
 pub async fn get_cart(
     Path(user_id): Path<Uuid>,
+    claims: Claims,
     State(pool): State<DbPool>,
 ) -> Result<Json<CartResponse>, AppError> {
+    check_cart_ownership(&claims, user_id)?;
+
     let rows = sqlx::query_as::<_, CartItemRow>(
         r#"
         SELECT ci.id, ci.product_id, ci.quantity,
@@ -51,11 +63,15 @@ pub async fn get_cart(
     Ok(Json(CartResponse::new(items)))
 }
 
+/// POST /api/cart/:user_id — owner or admin
 pub async fn add_to_cart(
     Path(user_id): Path<Uuid>,
+    claims: Claims,
     State(pool): State<DbPool>,
     Json(body): Json<AddToCart>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    check_cart_ownership(&claims, user_id)?;
+
     let now = chrono::Utc::now();
 
     let product_exists = sqlx::query("SELECT id FROM products WHERE id = $1")
@@ -108,11 +124,15 @@ pub async fn add_to_cart(
     }
 }
 
+/// PUT /api/cart/:user_id/:item_id — owner or admin
 pub async fn update_cart_item(
     Path((user_id, item_id)): Path<(Uuid, Uuid)>,
+    claims: Claims,
     State(pool): State<DbPool>,
     Json(body): Json<UpdateCartItem>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    check_cart_ownership(&claims, user_id)?;
+
     let now = chrono::Utc::now();
 
     let exists = sqlx::query("SELECT id FROM cart_items WHERE id = $1 AND user_id = $2")
@@ -146,10 +166,14 @@ pub async fn update_cart_item(
     Ok(Json(json!({"message": "Cart item updated successfully", "quantity": body.quantity})))
 }
 
+/// DELETE /api/cart/:user_id/:item_id — owner or admin
 pub async fn remove_from_cart(
     Path((user_id, item_id)): Path<(Uuid, Uuid)>,
+    claims: Claims,
     State(pool): State<DbPool>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    check_cart_ownership(&claims, user_id)?;
+
     let result = sqlx::query("DELETE FROM cart_items WHERE id = $1 AND user_id = $2")
         .bind(item_id)
         .bind(user_id)

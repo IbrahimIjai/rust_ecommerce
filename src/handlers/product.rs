@@ -5,10 +5,12 @@ use axum::{
 };
 use uuid::Uuid;
 
+use crate::auth::AdminClaims;
 use crate::error::AppError;
 use crate::models::{CreateProduct, Product, ProductResponse};
 use crate::services::DbPool;
 
+/// GET /api/products — Public
 pub async fn get_products(
     State(pool): State<DbPool>,
 ) -> Result<Json<Vec<ProductResponse>>, AppError> {
@@ -22,6 +24,7 @@ pub async fn get_products(
     Ok(Json(responses))
 }
 
+/// GET /api/products/:id — Public
 pub async fn get_product(
     Path(product_id): Path<Uuid>,
     State(pool): State<DbPool>,
@@ -36,7 +39,9 @@ pub async fn get_product(
     Ok(Json(ProductResponse::from(product)))
 }
 
+/// POST /api/products — Admin only
 pub async fn create_product(
+    AdminClaims(_): AdminClaims,
     State(pool): State<DbPool>,
     Json(body): Json<CreateProduct>,
 ) -> Result<(StatusCode, Json<ProductResponse>), AppError> {

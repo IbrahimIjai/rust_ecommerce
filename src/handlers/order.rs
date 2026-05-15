@@ -5,8 +5,9 @@ use axum::{
 };
 use uuid::Uuid;
 
+use crate::auth::{AdminClaims, Claims, Role};
 use crate::error::AppError;
-use crate::models::{CreateOrder, Order, OrderItemResponse, OrderResponse};
+use crate::models::{Order, OrderItemResponse, OrderResponse};
 use crate::services::DbPool;
 
 #[derive(sqlx::FromRow)]
@@ -41,7 +42,9 @@ async fn fetch_order_items(pool: &DbPool, order_id: Uuid) -> Result<Vec<OrderIte
         .collect())
 }
 
+/// GET /api/orders — Admin only: all orders
 pub async fn get_orders(
+    AdminClaims(_): AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<Vec<OrderResponse>>, AppError> {
     let orders = sqlx::query_as::<_, Order>("SELECT * FROM orders ORDER BY created_at DESC")
@@ -58,10 +61,16 @@ pub async fn get_orders(
     Ok(Json(responses))
 }
 
+/// GET /api/orders/user/:user_id — owner or admin
 pub async fn get_user_orders(
     Path(user_id): Path<Uuid>,
+    claims: Claims,
     State(pool): State<DbPool>,
 ) -> Result<Json<Vec<OrderResponse>>, AppError> {
+    if claims.role != Role::Admin && claims.user_id()? != user_id {
+        return Err(AppError::Forbidden);
+    }
+
     let orders = sqlx::query_as::<_, Order>(
         "SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC",
     )
@@ -79,29 +88,34 @@ pub async fn get_user_orders(
     Ok(Json(responses))
 }
 
+/// GET /api/orders/:id — owner or admin
 pub async fn get_order(
-    Path((user_id, order_id)): Path<(Uuid, Uuid)>,
+    Path(order_id): Path<Uuid>,
+    claims: Claims,
     State(pool): State<DbPool>,
 ) -> Result<Json<OrderResponse>, AppError> {
-    let order = sqlx::query_as::<_, Order>(
-        "SELECT * FROM orders WHERE id = $1 AND user_id = $2",
-    )
-    .bind(order_id)
-    .bind(user_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(AppError::from)?
-    .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
+    let order = sqlx::query_as::<_, Order>("SELECT * FROM orders WHERE id = $1")
+        .bind(order_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(AppError::from)?
+        .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
+
+    // Customers can only see their own orders
+    if claims.role != Role::Admin && claims.user_id()? != order.user_id {
+        return Err(AppError::Forbidden);
+    }
 
     let items = fetch_order_items(&pool, order.id).await?;
     Ok(Json(OrderResponse::new(order, items)))
 }
 
+/// POST /api/orders — Authenticated: user_id derived from JWT claims
 pub async fn create_order(
+    claims: Claims,
     State(pool): State<DbPool>,
-    Json(body): Json<CreateOrder>,
 ) -> Result<(StatusCode, Json<OrderResponse>), AppError> {
-    let user_id = body.user_id;
+    let user_id = claims.user_id()?;
     let now = chrono::Utc::now();
 
     let cart_items = sqlx::query_as::<_, CartItemForOrder>(
@@ -126,11 +140,7 @@ pub async fn create_order(
         .map(|i| i.product_price * i.quantity)
         .sum();
 
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(AppError::from)?;
-
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
     let order_id = Uuid::new_v4();
 
     sqlx::query(
@@ -145,15 +155,13 @@ pub async fn create_order(
     .bind(now)
     .execute(&mut *tx)
     .await
-    .map_err(|e| {
-        tracing::error!("Failed to insert order: {}", e);
-        AppError::from(e)
-    })?;
+    .map_err(AppError::from)?;
 
     for item in &cart_items {
         let subtotal = item.product_price * item.quantity;
         sqlx::query(
-            "INSERT INTO order_items (id, order_id, product_id, product_name, product_price, quantity, subtotal)
+            "INSERT INTO order_items
+             (id, order_id, product_id, product_name, product_price, quantity, subtotal)
              VALUES ($1, $2, $3, $4, $5, $6, $7)",
         )
         .bind(Uuid::new_v4())
@@ -165,10 +173,7 @@ pub async fn create_order(
         .bind(subtotal)
         .execute(&mut *tx)
         .await
-        .map_err(|e| {
-            tracing::error!("Failed to insert order item: {}", e);
-            AppError::from(e)
-        })?;
+        .map_err(AppError::from)?;
     }
 
     sqlx::query("DELETE FROM cart_items WHERE user_id = $1")

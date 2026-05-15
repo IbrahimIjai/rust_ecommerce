@@ -6,11 +6,14 @@ use axum::{
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::auth::{AdminClaims, Claims, Role};
 use crate::error::AppError;
 use crate::models::{CreateUser, User, UserResponse};
 use crate::services::DbPool;
 
+/// GET /api/users — Admin only
 pub async fn get_users(
+    AdminClaims(_): AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
     let users = sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY created_at DESC")
@@ -22,6 +25,7 @@ pub async fn get_users(
     Ok(Json(responses))
 }
 
+/// POST /api/users — legacy endpoint kept for compatibility (no auth required)
 pub async fn create_user(
     State(pool): State<DbPool>,
     Json(body): Json<CreateUser>,
@@ -30,7 +34,7 @@ pub async fn create_user(
     let now = chrono::Utc::now();
 
     sqlx::query(
-        "INSERT INTO users (id, email, name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO users (id, email, name, password_hash, created_at, updated_at) VALUES ($1, $2, $3, '', $4, $5)",
     )
     .bind(id)
     .bind(&body.email)
@@ -55,10 +59,17 @@ pub async fn create_user(
     Ok((StatusCode::CREATED, Json(UserResponse::from(user))))
 }
 
+/// GET /api/users/:id — own profile (customer) or any profile (admin)
 pub async fn get_user(
     Path(user_id): Path<Uuid>,
+    claims: Claims,
     State(pool): State<DbPool>,
 ) -> Result<Json<UserResponse>, AppError> {
+    // Customers can only fetch their own profile
+    if claims.role != Role::Admin && claims.user_id()? != user_id {
+        return Err(AppError::Forbidden);
+    }
+
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_optional(&pool)
@@ -69,8 +80,10 @@ pub async fn get_user(
     Ok(Json(UserResponse::from(user)))
 }
 
+/// DELETE /api/users/:id — Admin only
 pub async fn delete_user(
     Path(user_id): Path<Uuid>,
+    AdminClaims(_): AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let result = sqlx::query("DELETE FROM users WHERE id = $1")
