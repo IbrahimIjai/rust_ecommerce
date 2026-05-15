@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::auth::Claims;
 use crate::error::AppError;
-use crate::models::Order;
+use crate::models::{Order, OrderStatus};
 use crate::services::{DbPool, PaystackService};
 
 #[derive(serde::Deserialize)]
@@ -38,7 +38,7 @@ pub async fn initialize_payment(
         return Err(AppError::Forbidden);
     }
 
-    if order.status != "pending" {
+    if order.status != OrderStatus::Pending {
         return Err(AppError::BadRequest(
             "Order is not pending payment".to_string(),
         ));
@@ -125,7 +125,7 @@ pub async fn verify_payment(
         .ok_or_else(|| AppError::NotFound("Order not found for this payment reference".to_string()))?;
 
         sqlx::query("UPDATE orders SET status = $1 WHERE id = $2")
-            .bind("paid")
+            .bind(OrderStatus::Paid)
             .bind(order.id)
             .execute(&mut *tx)
             .await

@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::auth::{AdminClaims, Claims, Role};
 use crate::error::AppError;
-use crate::models::{Order, OrderItemResponse, OrderResponse};
+use crate::models::{Order, OrderItemResponse, OrderResponse, OrderStatus};
 use crate::services::DbPool;
 
 #[derive(sqlx::FromRow)]
@@ -150,7 +150,7 @@ pub async fn create_order(
     .bind(order_id)
     .bind(user_id)
     .bind(total_amount)
-    .bind("pending")
+    .bind(OrderStatus::Pending)
     .bind(now)
     .bind(now)
     .execute(&mut *tx)

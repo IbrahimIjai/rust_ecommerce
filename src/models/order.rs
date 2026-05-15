@@ -3,12 +3,41 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "order_status", rename_all = "snake_case")]
+pub enum OrderStatus {
+    Pending,
+    PaymentInitiated,
+    Paid,
+    Processing,
+    Shipped,
+    Delivered,
+    Cancelled,
+    Refunded,
+}
+
+impl OrderStatus {
+    pub fn can_transition_to(&self, next: &OrderStatus) -> bool {
+        matches!(
+            (self, next),
+            (OrderStatus::Pending, OrderStatus::PaymentInitiated)
+            | (OrderStatus::PaymentInitiated, OrderStatus::Paid)
+            | (OrderStatus::Paid, OrderStatus::Processing)
+            | (OrderStatus::Processing, OrderStatus::Shipped)
+            | (OrderStatus::Shipped, OrderStatus::Delivered)
+            | (OrderStatus::Pending, OrderStatus::Cancelled)
+            | (OrderStatus::PaymentInitiated, OrderStatus::Cancelled)
+            | (OrderStatus::Paid, OrderStatus::Refunded)
+        )
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Order {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub total_amount: i32, // Total amount in cents/kobo
-    pub status: String, // "pending", "paid", "shipped", "delivered", "cancelled"
+    pub total_amount: i32,
+    pub status: OrderStatus,
     pub payment_reference: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -88,7 +117,10 @@ impl OrderResponse {
             user_id: order.user_id,
             total_amount: order.total_amount,
             total_amount_formatted,
-            status: order.status,
+            status: serde_json::to_value(&order.status)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_else(|| format!("{:?}", order.status).to_lowercase()),
             payment_reference: order.payment_reference,
             created_at: order.created_at,
             items,

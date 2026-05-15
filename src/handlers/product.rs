@@ -17,8 +17,8 @@ pub async fn get_products(
     Query(filters): Query<ProductFilterParams>,
 ) -> Result<Json<Vec<ProductResponse>>, AppError> {
     // Build WHERE clauses dynamically
-    let mut conditions = vec!["is_active = TRUE"];
-    let mut param_idx = 1usize;
+    let conditions = vec!["is_active = TRUE"];
+    let param_idx = 1usize;
 
     // We use a fixed query approach to avoid sqlx QueryBuilder complexity at this stage
     // All active products, then filter in Rust (acceptable for small catalogs)
