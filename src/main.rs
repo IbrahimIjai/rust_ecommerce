@@ -6,6 +6,7 @@ use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod auth;
 mod config;
 mod error;
 mod handlers;
@@ -13,6 +14,7 @@ mod models;
 mod routes;
 mod services;
 
+use auth::JwtKeys;
 use config::Config;
 use routes::create_routes;
 use services::{create_connection_pool, run_migrations, AppState, PaystackService};
@@ -45,6 +47,7 @@ async fn main() {
     }
     info!("Database migrations applied successfully");
 
+    let jwt_keys = Arc::new(JwtKeys::new(config.jwt_signing_key.as_bytes()));
     let paystack_service = PaystackService::new();
     let server_address = config.server_address();
     let config = Arc::new(config);
@@ -53,11 +56,15 @@ async fn main() {
         .route(
             "/",
             get(|| async {
-                axum::Json(serde_json::json!({"message": "Rust E-commerce API", "version": env!("CARGO_PKG_VERSION")}))
+                axum::Json(serde_json::json!({
+                    "message": "Rust E-commerce API",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "docs": "/api/health"
+                }))
             }),
         )
         .nest("/api", create_routes())
-        .with_state(AppState::new(db_pool, paystack_service, config))
+        .with_state(AppState::new(db_pool, paystack_service, jwt_keys, config))
         .layer(
             ServiceBuilder::new()
                 .layer(CorsLayer::permissive())

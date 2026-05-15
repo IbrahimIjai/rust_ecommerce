@@ -6,4 +6,7 @@ pub mod user;
 pub use cart::{AddToCart, CartItemResponse, CartResponse, UpdateCartItem};
 pub use order::{CreateOrder, Order, OrderItemResponse, OrderResponse};
 pub use product::{CreateProduct, Product, ProductResponse};
-pub use user::{CreateUser, User, UserResponse};
+pub use user::{
+    AuthResponse, CreateUser, ForgotPasswordRequest, LoginRequest, RefreshRequest,
+    ResetPasswordRequest, SignupRequest, User, UserResponse,
+};

@@ -5,19 +5,26 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.9"
+axum-extra = { version = "0.9", features = ["typed-header"] }
+async-trait = "0.1"
+bcrypt = "0.15"
 chrono = { version = "0.4.44", features = ["serde"] }
+constant_time_eq = "0.3"
 dotenvy = "0.15.7"
+hex = "0.4"
+hmac = "0.12"
+jsonwebtoken = "9"
+rand = "0.8"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+sha2 = "0.10"
 sqlx = { version = "0.8.6", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
 thiserror = "2.0.18"
 tokio = { version = "1.49.0", features = ["full"] }
-uuid = { version = "1.21.0", features = ["v4", "serde"] }
-reqwest = { version = "0.12.9", features = ["json"] }
-env_logger = "0.11.6"
-log = "0.4.25"
-derive_more = { version = "1.0.0", features = ["display", "error"] }
 tower = "0.5.1"
-tower-http = { version = "0.6.2", features = ["trace", "cors"] }
+tower-http = { version = "0.6.2", features = ["trace", "cors", "request-id"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+uuid = { version = "1.21.0", features = ["v4", "serde"] }
+reqwest = { version = "0.12.9", features = ["json"] }
+validator = { version = "0.18", features = ["derive"] }
