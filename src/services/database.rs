@@ -6,8 +6,6 @@ use std::time::Duration;
 pub type DbPool = PgPool;
 
 pub async fn create_connection_pool() -> Result<DbPool, sqlx::Error> {
-    dotenvy::dotenv().ok();
-
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     // Configure connection pool with retry logic

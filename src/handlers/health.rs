@@ -1,29 +1,17 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Json,
-};
+use axum::{extract::State, response::Json};
 use serde_json::{json, Value};
-use crate::services::{DbPool, check_database_health};
 
-pub async fn health_check(
-    State(pool): State<DbPool>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    match check_database_health(&pool).await {
-        Ok(_) => Ok(Json(json!({
-            "status": "healthy",
-            "database": "connected"
-        }))),
-        Err(e) => {
-            tracing::error!("Database health check failed: {}", e);
-            Err((
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(json!({
-                    "status": "unhealthy",
-                    "database": "disconnected",
-                    "error": "Database connection failed"
-                })),
-            ))
-        }
-    }
+use crate::error::AppError;
+use crate::services::{check_database_health, DbPool};
+
+pub async fn health_check(State(pool): State<DbPool>) -> Result<Json<Value>, AppError> {
+    check_database_health(&pool)
+        .await
+        .map_err(|e| AppError::ServiceUnavailable(e.to_string()))?;
+
+    Ok(Json(json!({
+        "status": "healthy",
+        "database": "connected",
+        "version": env!("CARGO_PKG_VERSION")
+    })))
 }

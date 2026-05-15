@@ -28,7 +28,7 @@ pub struct ProductResponse {
 
 impl From<Product> for ProductResponse {
     fn from(product: Product) -> Self {
-        let price_formatted = format!("${:.2}", product.price as f64 / 100.0);
+        let price_formatted = format!("₦{:.2}", product.price as f64 / 100.0);
         Self {
             id: product.id,
             name: product.name,

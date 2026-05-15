@@ -1,32 +1,32 @@
+use std::sync::Arc;
+
 use axum::{routing::get, Router};
-use std::env;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod config;
+mod error;
 mod handlers;
 mod models;
 mod routes;
 mod services;
 
+use config::Config;
 use routes::create_routes;
-use services::{create_connection_pool, AppState, PaystackService};
+use services::{create_connection_pool, run_migrations, AppState, PaystackService};
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
 
+    let config = Config::from_env();
+
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            env::var("RUST_LOG").unwrap_or_else(|_| "rust_ecommerce=debug,tower_http=debug".into()),
-        ))
+        .with(tracing_subscriber::EnvFilter::new(&config.rust_log))
         .with(tracing_subscriber::fmt::layer())
         .init();
-
-    let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
-    let server_address = format!("{}:{}", host, port);
 
     let db_pool = match create_connection_pool().await {
         Ok(pool) => {
@@ -35,21 +35,29 @@ async fn main() {
         }
         Err(e) => {
             tracing::error!("Failed to create database connection pool: {}", e);
-            tracing::error!("Please ensure PostgreSQL is running and accessible");
-            tracing::error!("See DATABASE_SETUP.md for setup instructions");
             std::process::exit(1);
         }
     };
 
+    if let Err(e) = run_migrations(&db_pool).await {
+        tracing::error!("Failed to run migrations: {}", e);
+        std::process::exit(1);
+    }
+    info!("Database migrations applied successfully");
+
     let paystack_service = PaystackService::new();
+    let server_address = config.server_address();
+    let config = Arc::new(config);
 
     let app = Router::new()
         .route(
             "/",
-            get(|| async { axum::Json(serde_json::json!({"message": "Rust E-commerce API"})) }),
+            get(|| async {
+                axum::Json(serde_json::json!({"message": "Rust E-commerce API", "version": env!("CARGO_PKG_VERSION")}))
+            }),
         )
         .nest("/api", create_routes())
-        .with_state(AppState::new(db_pool, paystack_service))
+        .with_state(AppState::new(db_pool, paystack_service, config))
         .layer(
             ServiceBuilder::new()
                 .layer(CorsLayer::permissive())

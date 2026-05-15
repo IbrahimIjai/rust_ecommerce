@@ -67,8 +67,6 @@ pub struct PaystackService {
 
 impl PaystackService {
     pub fn new() -> Self {
-        dotenvy::dotenv().ok();
-        
         let secret_key = env::var("PAYSTACK_SECRET_KEY")
             .expect("PAYSTACK_SECRET_KEY must be set");
         let mock_mode_env = env::var("PAYSTACK_MOCK")

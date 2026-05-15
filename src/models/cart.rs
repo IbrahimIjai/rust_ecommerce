@@ -45,8 +45,8 @@ impl CartItemResponse {
         quantity: i32,
     ) -> Self {
         let subtotal = product_price * quantity;
-        let product_price_formatted = format!("${:.2}", product_price as f64 / 100.0);
-        let subtotal_formatted = format!("${:.2}", subtotal as f64 / 100.0);
+        let product_price_formatted = format!("₦{:.2}", product_price as f64 / 100.0);
+        let subtotal_formatted = format!("₦{:.2}", subtotal as f64 / 100.0);
 
         Self {
             id,
