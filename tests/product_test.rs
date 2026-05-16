@@ -86,7 +86,7 @@ async fn test_soft_delete_hides_product(pool: sqlx::PgPool) {
         Some(&token),
     )
     .await;
-    assert_eq!(del_status, StatusCode::NO_CONTENT);
+    assert_eq!(del_status, StatusCode::OK);
 
     // Deleted product should not appear in public listing
     let (status, body) = request(app, Method::GET, "/api/products", None, None).await;

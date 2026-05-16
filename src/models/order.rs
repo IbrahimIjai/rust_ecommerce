@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "order_status", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum OrderStatus {
     Pending,
     PaymentInitiated,
