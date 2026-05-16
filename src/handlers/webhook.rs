@@ -24,7 +24,7 @@ fn verify_paystack_signature(secret: &str, body: &[u8], signature: &str) -> bool
     constant_time_eq(computed.as_bytes(), signature.as_bytes())
 }
 
-/// POST /api/payment/webhook — Public (Paystack calls this directly)
+/// POST /api/payment/webhook — called by Paystack, not user-facing (excluded from OpenAPI docs)
 pub async fn paystack_webhook(
     State(pool): State<DbPool>,
     State(config): State<Arc<Config>>,

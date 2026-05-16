@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "order_status", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum OrderStatus {
@@ -60,7 +61,7 @@ pub struct CreateOrder {
     pub user_id: Uuid,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrderResponse {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -72,7 +73,7 @@ pub struct OrderResponse {
     pub items: Vec<OrderItemResponse>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrderItemResponse {
     pub product_id: Uuid,
     pub product_name: String,

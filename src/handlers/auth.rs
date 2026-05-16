@@ -26,6 +26,15 @@ fn build_auth_response(
     Ok(AuthResponse::new(access_token, refresh_token))
 }
 
+#[utoipa::path(
+    post, path = "/api/auth/signup", tag = "Auth",
+    request_body = SignupRequest,
+    responses(
+        (status = 201, description = "Registered successfully", body = AuthResponse),
+        (status = 409, description = "Email already in use"),
+        (status = 422, description = "Validation error"),
+    )
+)]
 pub async fn signup(
     State(pool): State<DbPool>,
     State(keys): State<Arc<JwtKeys>>,
@@ -68,6 +77,14 @@ pub async fn signup(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
+#[utoipa::path(
+    post, path = "/api/auth/login", tag = "Auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials"),
+    )
+)]
 pub async fn login(
     State(pool): State<DbPool>,
     State(keys): State<Arc<JwtKeys>>,
@@ -97,6 +114,14 @@ pub async fn login(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    post, path = "/api/auth/refresh", tag = "Auth",
+    request_body = RefreshRequest,
+    responses(
+        (status = 200, description = "New access token issued", body = AuthResponse),
+        (status = 401, description = "Invalid or expired refresh token"),
+    )
+)]
 pub async fn refresh_token(
     State(pool): State<DbPool>,
     State(keys): State<Arc<JwtKeys>>,
@@ -122,6 +147,13 @@ pub async fn refresh_token(
     Ok(Json(response))
 }
 
+#[utoipa::path(
+    post, path = "/api/auth/forgot-password", tag = "Auth",
+    request_body = ForgotPasswordRequest,
+    responses(
+        (status = 200, description = "Reset link sent if email is registered (always 200)"),
+    )
+)]
 pub async fn forgot_password(
     State(pool): State<DbPool>,
     Json(body): Json<ForgotPasswordRequest>,
@@ -165,6 +197,15 @@ pub async fn forgot_password(
     Ok(Json(generic_ok))
 }
 
+#[utoipa::path(
+    post, path = "/api/auth/reset-password", tag = "Auth",
+    request_body = ResetPasswordRequest,
+    responses(
+        (status = 200, description = "Password reset successfully"),
+        (status = 400, description = "Invalid or expired token"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn reset_password(
     State(pool): State<DbPool>,
     _claims: Claims, // Requires a valid access token
@@ -211,6 +252,14 @@ pub async fn reset_password(
     Ok(Json(serde_json::json!({"message": "Password reset successfully"})))
 }
 
+#[utoipa::path(
+    get, path = "/api/auth/me", tag = "Auth",
+    responses(
+        (status = 200, description = "Current user profile", body = UserResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn me(
     claims: Claims,
     State(pool): State<DbPool>,

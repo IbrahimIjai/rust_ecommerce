@@ -42,9 +42,16 @@ async fn fetch_order_items(pool: &DbPool, order_id: Uuid) -> Result<Vec<OrderIte
         .collect())
 }
 
-/// GET /api/orders — Admin only: all orders
+#[utoipa::path(
+    get, path = "/api/orders", tag = "Orders",
+    responses(
+        (status = 200, description = "All orders (admin only)", body = Vec<OrderResponse>),
+        (status = 403, description = "Admin only"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_orders(
-    AdminClaims(_): AdminClaims,
+    _admin: AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<Vec<OrderResponse>>, AppError> {
     let orders = sqlx::query_as::<_, Order>("SELECT * FROM orders ORDER BY created_at DESC")
@@ -61,7 +68,15 @@ pub async fn get_orders(
     Ok(Json(responses))
 }
 
-/// GET /api/orders/user/:user_id — owner or admin
+#[utoipa::path(
+    get, path = "/api/orders/user/{user_id}", tag = "Orders",
+    params(("user_id" = Uuid, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "Orders for a user", body = Vec<OrderResponse>),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_user_orders(
     Path(user_id): Path<Uuid>,
     claims: Claims,
@@ -88,7 +103,16 @@ pub async fn get_user_orders(
     Ok(Json(responses))
 }
 
-/// GET /api/orders/:id — owner or admin
+#[utoipa::path(
+    get, path = "/api/orders/{id}", tag = "Orders",
+    params(("id" = Uuid, Path, description = "Order ID")),
+    responses(
+        (status = 200, description = "Order details", body = OrderResponse),
+        (status = 404, description = "Order not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_order(
     Path(order_id): Path<Uuid>,
     claims: Claims,
@@ -110,7 +134,15 @@ pub async fn get_order(
     Ok(Json(OrderResponse::new(order, items)))
 }
 
-/// POST /api/orders — Authenticated: user_id derived from JWT claims
+#[utoipa::path(
+    post, path = "/api/orders", tag = "Orders",
+    responses(
+        (status = 201, description = "Order created from cart, stock decremented", body = OrderResponse),
+        (status = 400, description = "Empty cart or insufficient stock"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn create_order(
     claims: Claims,
     State(pool): State<DbPool>,

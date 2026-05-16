@@ -4,6 +4,7 @@ pub mod error;
 pub mod extractors;
 pub mod handlers;
 pub mod models;
+pub mod openapi;
 pub mod routes;
 pub mod services;
 
@@ -24,9 +25,12 @@ use tower_http::{
     request_id::{MakeRequestUuid, SetRequestIdLayer},
     trace::TraceLayer,
 };
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use auth::JwtKeys;
 use config::Config;
+use openapi::ApiDoc;
 use routes::create_routes;
 use services::{AppState, DbPool, PaystackService};
 
@@ -40,10 +44,11 @@ pub fn build_app(state: AppState) -> Router {
                 axum::Json(serde_json::json!({
                     "message": "Rust E-commerce API",
                     "version": env!("CARGO_PKG_VERSION"),
-                    "docs": "/api/health"
+                    "docs": "/docs"
                 }))
             }),
         )
+        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest("/api", create_routes())
         .with_state(state)
         .layer(

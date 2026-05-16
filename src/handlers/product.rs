@@ -11,7 +11,19 @@ use crate::error::AppError;
 use crate::models::{CreateProduct, Product, ProductFilterParams, ProductResponse, UpdateProduct};
 use crate::services::DbPool;
 
-/// GET /api/products — Public, with optional filters
+#[utoipa::path(
+    get, path = "/api/products", tag = "Products",
+    params(
+        ("category" = Option<String>, Query, description = "Filter by category"),
+        ("min_price" = Option<i32>, Query, description = "Minimum price in kobo"),
+        ("max_price" = Option<i32>, Query, description = "Maximum price in kobo"),
+        ("search" = Option<String>, Query, description = "Search in name and description"),
+        ("in_stock" = Option<bool>, Query, description = "Filter by stock availability"),
+    ),
+    responses(
+        (status = 200, description = "List of active products", body = Vec<ProductResponse>),
+    )
+)]
 pub async fn get_products(
     State(pool): State<DbPool>,
     Query(filters): Query<ProductFilterParams>,
@@ -76,7 +88,14 @@ pub async fn get_products(
     Ok(Json(responses))
 }
 
-/// GET /api/products/:id — Public
+#[utoipa::path(
+    get, path = "/api/products/{id}", tag = "Products",
+    params(("id" = Uuid, Path, description = "Product ID")),
+    responses(
+        (status = 200, description = "Product details", body = ProductResponse),
+        (status = 404, description = "Product not found"),
+    )
+)]
 pub async fn get_product(
     Path(product_id): Path<Uuid>,
     State(pool): State<DbPool>,
@@ -91,9 +110,18 @@ pub async fn get_product(
     Ok(Json(ProductResponse::from(product)))
 }
 
-/// POST /api/products — Admin only
+#[utoipa::path(
+    post, path = "/api/products", tag = "Products",
+    request_body = CreateProduct,
+    responses(
+        (status = 201, description = "Product created", body = ProductResponse),
+        (status = 400, description = "Invalid price"),
+        (status = 403, description = "Admin only"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn create_product(
-    AdminClaims(_): AdminClaims,
+    _admin: AdminClaims,
     State(pool): State<DbPool>,
     Json(body): Json<CreateProduct>,
 ) -> Result<(StatusCode, Json<ProductResponse>), AppError> {
@@ -134,10 +162,20 @@ pub async fn create_product(
     Ok((StatusCode::CREATED, Json(ProductResponse::from(product))))
 }
 
-/// PUT /api/products/:id — Admin only (partial update)
+#[utoipa::path(
+    put, path = "/api/products/{id}", tag = "Products",
+    params(("id" = Uuid, Path, description = "Product ID")),
+    request_body = UpdateProduct,
+    responses(
+        (status = 200, description = "Product updated", body = ProductResponse),
+        (status = 404, description = "Product not found"),
+        (status = 403, description = "Admin only"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn update_product(
     Path(product_id): Path<Uuid>,
-    AdminClaims(_): AdminClaims,
+    _admin: AdminClaims,
     State(pool): State<DbPool>,
     Json(body): Json<UpdateProduct>,
 ) -> Result<Json<ProductResponse>, AppError> {
@@ -192,10 +230,19 @@ pub async fn update_product(
     Ok(Json(ProductResponse::from(product)))
 }
 
-/// DELETE /api/products/:id — Admin only (soft delete)
+#[utoipa::path(
+    delete, path = "/api/products/{id}", tag = "Products",
+    params(("id" = Uuid, Path, description = "Product ID")),
+    responses(
+        (status = 200, description = "Product deactivated"),
+        (status = 404, description = "Product not found"),
+        (status = 403, description = "Admin only"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn delete_product(
     Path(product_id): Path<Uuid>,
-    AdminClaims(_): AdminClaims,
+    _admin: AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let result = sqlx::query(

@@ -7,6 +7,7 @@ use axum_extra::{
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Header, Validation};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::auth::keys::JwtKeys;
@@ -16,7 +17,7 @@ use crate::services::AppState;
 pub const ACCESS_TOKEN_MINUTES: i64 = 15;
 pub const REFRESH_TOKEN_DAYS: i64 = 7;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
 pub enum Role {
     Customer,

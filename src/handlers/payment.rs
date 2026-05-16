@@ -1,5 +1,6 @@
 use axum::{extract::State, response::Json};
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::auth::Claims;
@@ -7,19 +8,28 @@ use crate::error::AppError;
 use crate::models::{Order, OrderStatus};
 use crate::services::{DbPool, PaystackService};
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct InitializePaymentRequest {
     pub order_id: Uuid,
     /// Customer email to send Paystack payment link to
     pub email: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, ToSchema)]
 pub struct VerifyPaymentRequest {
     pub reference: String,
 }
 
-/// POST /api/payment/initialize — Authenticated
+#[utoipa::path(
+    post, path = "/api/payment/initialize", tag = "Payment",
+    request_body = InitializePaymentRequest,
+    responses(
+        (status = 200, description = "Payment initialized, returns Paystack checkout URL"),
+        (status = 400, description = "Order not pending or not found"),
+        (status = 403, description = "Can only pay for your own order"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn initialize_payment(
     claims: Claims,
     State(pool): State<DbPool>,
@@ -103,7 +113,15 @@ pub async fn initialize_payment(
     })))
 }
 
-/// POST /api/payment/verify — Authenticated
+#[utoipa::path(
+    post, path = "/api/payment/verify", tag = "Payment",
+    request_body = VerifyPaymentRequest,
+    responses(
+        (status = 200, description = "Payment verified, order marked as paid"),
+        (status = 400, description = "Payment not successful"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn verify_payment(
     _claims: Claims,
     State(pool): State<DbPool>,

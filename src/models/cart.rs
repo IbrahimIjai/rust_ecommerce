@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -14,20 +15,20 @@ pub struct CartItem {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct AddToCart {
     pub product_id: Uuid,
     #[validate(range(min = 1, max = 100, message = "quantity must be between 1 and 100"))]
     pub quantity: i32,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct UpdateCartItem {
     #[validate(range(min = 0, max = 100, message = "quantity must be between 0 and 100"))]
     pub quantity: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CartItemResponse {
     pub id: Uuid,
     pub product_id: Uuid,
@@ -64,7 +65,7 @@ impl CartItemResponse {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CartResponse {
     pub items: Vec<CartItemResponse>,
     pub total_items: i32,
