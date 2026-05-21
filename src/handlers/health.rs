@@ -5,6 +5,13 @@ use std::time::Instant;
 use crate::error::AppError;
 use crate::services::DbPool;
 
+#[utoipa::path(
+    get, path = "/api/health", tag = "Health",
+    responses(
+        (status = 200, description = "Service and database are healthy", body = serde_json::Value),
+        (status = 503, description = "Database health check failed"),
+    )
+)]
 pub async fn health_check(State(pool): State<DbPool>) -> Result<Json<Value>, AppError> {
     let start = Instant::now();
     sqlx::query("SELECT 1")

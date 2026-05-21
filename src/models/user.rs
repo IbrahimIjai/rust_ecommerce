@@ -24,7 +24,7 @@ pub struct User {
 
 // ─── Request bodies ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateUser {
     pub email: String,
     pub name: String,

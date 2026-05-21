@@ -32,7 +32,16 @@ fn check_cart_ownership(claims: &Claims, path_user_id: Uuid) -> Result<(), AppEr
     Ok(())
 }
 
-/// GET /api/cart/:user_id — owner or admin
+#[utoipa::path(
+    get, path = "/api/cart/{user_id}", tag = "Cart",
+    params(("user_id" = Uuid, Path, description = "User ID whose cart should be returned")),
+    responses(
+        (status = 200, description = "Cart contents", body = CartResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Owner or admin only"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_cart(
     Path(user_id): Path<Uuid>,
     claims: Claims,
@@ -57,13 +66,32 @@ pub async fn get_cart(
 
     let items = rows
         .into_iter()
-        .map(|r| CartItemResponse::new(r.id, r.product_id, r.product_name, r.product_price, r.quantity))
+        .map(|r| {
+            CartItemResponse::new(
+                r.id,
+                r.product_id,
+                r.product_name,
+                r.product_price,
+                r.quantity,
+            )
+        })
         .collect();
 
     Ok(Json(CartResponse::new(items)))
 }
 
-/// POST /api/cart/:user_id — owner or admin
+#[utoipa::path(
+    post, path = "/api/cart/{user_id}", tag = "Cart",
+    params(("user_id" = Uuid, Path, description = "User ID whose cart should receive the item")),
+    request_body = AddToCart,
+    responses(
+        (status = 200, description = "Item added to cart or existing quantity updated", body = serde_json::Value),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Owner or admin only"),
+        (status = 404, description = "Product not found"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn add_to_cart(
     Path(user_id): Path<Uuid>,
     claims: Claims,
@@ -103,7 +131,9 @@ pub async fn add_to_cart(
             .await
             .map_err(AppError::from)?;
 
-        Ok(Json(json!({"message": "Cart item updated successfully", "quantity": new_qty})))
+        Ok(Json(
+            json!({"message": "Cart item updated successfully", "quantity": new_qty}),
+        ))
     } else {
         let new_id = Uuid::new_v4();
         sqlx::query(
@@ -120,11 +150,27 @@ pub async fn add_to_cart(
         .await
         .map_err(AppError::from)?;
 
-        Ok(Json(json!({"message": "Item added to cart successfully", "cart_item_id": new_id})))
+        Ok(Json(
+            json!({"message": "Item added to cart successfully", "cart_item_id": new_id}),
+        ))
     }
 }
 
-/// PUT /api/cart/:user_id/:item_id — owner or admin
+#[utoipa::path(
+    put, path = "/api/cart/{user_id}/{item_id}", tag = "Cart",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID that owns the cart item"),
+        ("item_id" = Uuid, Path, description = "Cart item ID"),
+    ),
+    request_body = UpdateCartItem,
+    responses(
+        (status = 200, description = "Cart item updated or removed when quantity is zero", body = serde_json::Value),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Owner or admin only"),
+        (status = 404, description = "Cart item not found"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn update_cart_item(
     Path((user_id, item_id)): Path<(Uuid, Uuid)>,
     claims: Claims,
@@ -163,10 +209,25 @@ pub async fn update_cart_item(
         .await
         .map_err(AppError::from)?;
 
-    Ok(Json(json!({"message": "Cart item updated successfully", "quantity": body.quantity})))
+    Ok(Json(
+        json!({"message": "Cart item updated successfully", "quantity": body.quantity}),
+    ))
 }
 
-/// DELETE /api/cart/:user_id/:item_id — owner or admin
+#[utoipa::path(
+    delete, path = "/api/cart/{user_id}/{item_id}", tag = "Cart",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID that owns the cart item"),
+        ("item_id" = Uuid, Path, description = "Cart item ID"),
+    ),
+    responses(
+        (status = 200, description = "Cart item removed", body = serde_json::Value),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Owner or admin only"),
+        (status = 404, description = "Cart item not found"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn remove_from_cart(
     Path((user_id, item_id)): Path<(Uuid, Uuid)>,
     claims: Claims,

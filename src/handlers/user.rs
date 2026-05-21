@@ -11,9 +11,17 @@ use crate::error::AppError;
 use crate::models::{CreateUser, User, UserResponse};
 use crate::services::DbPool;
 
-/// GET /api/users — Admin only
+#[utoipa::path(
+    get, path = "/api/users/", tag = "Users",
+    responses(
+        (status = 200, description = "All users", body = Vec<UserResponse>),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin only"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_users(
-    AdminClaims(_): AdminClaims,
+    _admin: AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<Vec<UserResponse>>, AppError> {
     let users = sqlx::query_as::<_, User>("SELECT * FROM users ORDER BY created_at DESC")
@@ -25,7 +33,14 @@ pub async fn get_users(
     Ok(Json(responses))
 }
 
-/// POST /api/users — legacy endpoint kept for compatibility (no auth required)
+#[utoipa::path(
+    post, path = "/api/users/", tag = "Users",
+    request_body = CreateUser,
+    responses(
+        (status = 201, description = "User created", body = UserResponse),
+        (status = 409, description = "Email already in use"),
+    )
+)]
 pub async fn create_user(
     State(pool): State<DbPool>,
     Json(body): Json<CreateUser>,
@@ -59,7 +74,17 @@ pub async fn create_user(
     Ok((StatusCode::CREATED, Json(UserResponse::from(user))))
 }
 
-/// GET /api/users/:id — own profile (customer) or any profile (admin)
+#[utoipa::path(
+    get, path = "/api/users/{id}", tag = "Users",
+    params(("id" = Uuid, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "User profile", body = UserResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Own profile or admin only"),
+        (status = 404, description = "User not found"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_user(
     Path(user_id): Path<Uuid>,
     claims: Claims,
@@ -80,10 +105,20 @@ pub async fn get_user(
     Ok(Json(UserResponse::from(user)))
 }
 
-/// DELETE /api/users/:id — Admin only
+#[utoipa::path(
+    delete, path = "/api/users/{id}", tag = "Users",
+    params(("id" = Uuid, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "User deleted", body = serde_json::Value),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin only"),
+        (status = 404, description = "User not found"),
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn delete_user(
     Path(user_id): Path<Uuid>,
-    AdminClaims(_): AdminClaims,
+    _admin: AdminClaims,
     State(pool): State<DbPool>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let result = sqlx::query("DELETE FROM users WHERE id = $1")

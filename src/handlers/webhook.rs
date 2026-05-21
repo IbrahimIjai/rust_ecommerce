@@ -24,7 +24,22 @@ fn verify_paystack_signature(secret: &str, body: &[u8], signature: &str) -> bool
     constant_time_eq(computed.as_bytes(), signature.as_bytes())
 }
 
-/// POST /api/payment/webhook — called by Paystack, not user-facing (excluded from OpenAPI docs)
+#[utoipa::path(
+    post, path = "/api/payment/webhook", tag = "Payment",
+    request_body(
+        content = serde_json::Value,
+        description = "Raw Paystack webhook event payload",
+        content_type = "application/json"
+    ),
+    params(
+        ("x-paystack-signature" = String, Header, description = "Paystack HMAC-SHA512 signature")
+    ),
+    responses(
+        (status = 200, description = "Webhook accepted or duplicate ignored"),
+        (status = 400, description = "Invalid JSON payload"),
+        (status = 401, description = "Missing or invalid signature"),
+    )
+)]
 pub async fn paystack_webhook(
     State(pool): State<DbPool>,
     State(config): State<Arc<Config>>,
@@ -42,8 +57,8 @@ pub async fn paystack_webhook(
     }
 
     // 2. Parse event payload
-    let payload: serde_json::Value =
-        serde_json::from_slice(&body).map_err(|_| AppError::BadRequest("Invalid JSON".to_string()))?;
+    let payload: serde_json::Value = serde_json::from_slice(&body)
+        .map_err(|_| AppError::BadRequest("Invalid JSON".to_string()))?;
 
     let event_type = payload["event"].as_str().unwrap_or("unknown").to_string();
     let reference = payload["data"]["reference"].as_str().map(|s| s.to_string());
